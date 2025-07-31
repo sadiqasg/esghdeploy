@@ -1,0 +1,39 @@
+enum UserStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  DISABLED
+}
+
+model User {
+  id                Int          @id @default(autoincrement())
+  email             String       @unique @db.VarChar(255)
+  password          String       @db.VarChar(255)
+  first_name        String       @db.VarChar(100)
+  last_name         String?      @db.VarChar(100)
+  phone_number      String?      @db.VarChar(20)
+
+  roleId            Int
+  role              Role         @relation(fields: [roleId], references: [id])
+
+  permissionId      Int?
+  permission        Permission?   @relation(fields: [permissionId], references: [id])
+
+  company           String?      @db.VarChar(100)
+  company_id        String?      @db.VarChar(50)
+
+  status            UserStatus   @default(PENDING)
+  profile_photo_url String?      @db.VarChar(255)
+  last_login        DateTime?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  refreshTokens     RefreshToken[]
+  otpHash               String?
+  otpExpiresAt      DateTime?
+
+  @@map("users")
+  @@index([email])
+  @@index([status])
+  @@index([company_id])
+  @@index([created_at])
+}
