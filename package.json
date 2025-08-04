@@ -6,12 +6,12 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "npx prisma generate --schema=./prisma/schema && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main",
     "prisma-cmd": "prisma --schema=./prisma/schema",
     "prisma:generate": "npm run prisma-cmd generate",
     "prisma:migrate": "npm run prisma-cmd migrate dev",
@@ -27,8 +27,7 @@
     "make-badge": "coverage-badges",
     "test:badges": "npm run test:cov && npm run make-badge",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "postinstall": "prisma generate --schema=./prisma/schema"
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
