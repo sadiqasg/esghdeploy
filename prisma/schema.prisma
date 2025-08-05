@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum CompanyStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+model Company {
+  id                        Int           @id @default(autoincrement())
+  name                      String        @unique
+  registration_number       String
+  industry_type             String
+  address                   String
+  contact_email             String
+  website                   String?
+  contact_phone             String
+  company_logo_url          String?
+  status                    CompanyStatus @default(PENDING)
+  staff                     Json?
+  created_at                DateTime      @default(now())
+  created_by                Int
+  updated_at                DateTime      @updatedAt
+  updated_by                Int
+  current_subscription_tier Int?
+
+  subscription Subscription? @relation(fields: [current_subscription_tier], references: [id], name: "CompanyCurrentSubscription")
+
+  users User[] @relation("CompanyUsers")
+
+  companySubscriptions CompanySubscription[] @relation("CompanySubs")
+  departments Department[]
+
+  @@index([status])
+  @@index([created_at])
+
+  @@map("companies")
+}
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+}
+
+model CompanySubscription {
+  id              Int                @id @default(autoincrement())
+  company_id      Int
+  subscription_id Int
+  start_date      DateTime
+  end_date        DateTime?
+  status          SubscriptionStatus @default(ACTIVE)
+  created_by      Int
+  updated_by      Int
+  created_at      DateTime           @default(now())
+  updated_at      DateTime           @updatedAt
+
+  Company      Company      @relation(fields: [company_id], references: [id], name: "CompanySubs")
+  Subscription Subscription @relation(fields: [subscription_id], references: [id], name: "CompanySubs")
+
+  @@index([company_id])
+  @@index([subscription_id])
+  @@index([status])
+
+  @@map("company_subscriptions")
+}
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  users       User[]  @relation("DepartmentUsers")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+model Permission {
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  description     String?
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}model rate_limit {
+  key        String   @id
+  hits       Int
+  expires_at DateTime
+}model RefreshToken {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  user          User     @relation(fields: [user_id], references: [id])
+  refresh_token String   @unique
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+  @@index([refresh_token])
+  @@map("refresh_tokens")
+}
+enum RoleNames {
+  SUPER_ADMIN
+  RESTRICTED_ADMIN
+  ADMIN_VIEWER
+  ADMIN_EDITOR
+  SUSTAINABILITY_MANAGER
+  SUB_ADMIN
+  C_SUITE_EXEC
+  REGULATOR
+  INVESTOR
+}
+
+model Role {
+  id          Int       @id @default(autoincrement())
+  name        RoleNames @unique
+  description String?
+  users       User[]
+
+  @@map("roles")
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model Subscription {
+  id               Int      @id @default(autoincrement())
+  name             String
+  description      String?
+  price_monthly    Float
+  price_annual     Float
+  discount         Float?
+  max_team_members Int?
+  features         Json?
+  created_at       DateTime @default(now())
+  created_by       Int
+  updated_at       DateTime @updatedAt
+  updated_by       Int
+
+  companySubscriptions CompanySubscription[] @relation("CompanySubs")
+  companies            Company[]             @relation("CompanyCurrentSubscription")
+
+  @@map("subscription")
+}
+enum UserStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  DISABLED
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  email        String  @unique @db.VarChar(255)
+  password     String  @db.VarChar(255)
+  first_name   String  @db.VarChar(100)
+  last_name    String? @db.VarChar(100)
+  phone_number String? @db.VarChar(20)
+
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
+
+  companyId Int
+  company   Company? @relation(fields: [companyId], references: [id], name: "CompanyUsers")
+
+  departmentId Int?
+  department Department? @relation(fields: [departmentId], references: [id], name: "DepartmentUsers")
+
+  permissions UserPermission[]
+
+  status            UserStatus     @default(PENDING)
+  profile_photo_url String?        @db.VarChar(255)
+  last_login        DateTime?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+  refreshTokens     RefreshToken[]
+  otpHash           String?
+  otpExpiresAt      DateTime?
+
+  @@index([email])
+  @@index([status])
+  @@index([companyId])
+  @@index([created_at])
+  @@map("users")
+}
+model UserPermission {
+    id           Int @id @default(autoincrement())
+    userId       Int
+    permissionId Int
+
+    user       User       @relation(fields: [userId], references: [id])
+    permission Permission @relation(fields: [permissionId], references: [id])
+
+    @@unique([userId, permissionId])
+    @@map("user_permissions")
+}
