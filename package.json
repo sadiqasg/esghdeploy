@@ -13,7 +13,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "prisma-cmd": "prisma --schema=./prisma/schema",
+    "prisma-cmd": "prisma --schema=./prisma/schema.prisma",
     "prisma:generate": "npm run prisma-cmd generate",
     "prisma:migrate": "npm run prisma-cmd migrate dev",
     "prisma:studio": "npm run prisma-cmd studio",
