@@ -12,7 +12,7 @@
         "start:dev": "nest start --watch",
         "start:debug": "nest start --debug --watch",
         "start:prod": "node dist/src/main",
-        "postinstall": "npx prisma generate --schema=prisma/schema.prisma",
+        "postinstall": "npx prisma generate --schema=prisma/schema",
         "prisma-cmd": "prisma --schema=./prisma/schema",
         "prisma:generate": "npm run prisma-cmd generate",
         "prisma:migrate": "npm run prisma-cmd migrate dev",
