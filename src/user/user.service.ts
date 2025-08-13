@@ -17,7 +17,10 @@ export class UserService {
         first_name: true,
         last_name: true,
         email: true,
+        phone_number: true,
         profile_photo_url: true,
+        role: true,
+        company: true
       },
     });
   }
