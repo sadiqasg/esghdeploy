@@ -38,7 +38,7 @@ describe('AuthController', () => {
       password: 'password123',
       first_name: 'Jaga',
       last_name: 'Ban',
-      role: 'SUPER_ADMIN',
+      role: 'super_admin'
     };
 
     const result = await controller.register(dto);

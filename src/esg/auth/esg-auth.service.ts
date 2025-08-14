@@ -1,18 +1,21 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
 import {
-  UserStatus,
-  CompanyStatus,
-  RoleNames,
-  Company,
-  Role,
-} from '@prisma/client';
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import { UserStatus, CompanyStatus, Company, RoleName } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EsgSignupDto } from './dtos/esg-signup.dto';
+import { isCompanyEmail } from 'src/utils/blacklist-emails';
+import { EmailService } from 'src/email/email.service';
 
 @Injectable()
 export class EsgAuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async signup(dto: EsgSignupDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -21,6 +24,12 @@ export class EsgAuthService {
 
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
+    if (!isCompanyEmail(dto.email)) {
+      throw new BadRequestException(
+        'Please register with your company email address, not a personal email.',
+      );
     }
 
     const existingCompany: Company | null = await this.prisma.company.findFirst(
@@ -37,27 +46,27 @@ export class EsgAuthService {
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const sustainabilityManagerRole: Role | null =
-      await this.prisma.role.findUnique({
-        where: { name: RoleNames.SUSTAINABILITY_MANAGER },
-      });
+    const companyESGAdminRole = await this.prisma.role.findUnique({
+      where: { name: RoleName.company_esg_admin },
+    });
 
-    if (!sustainabilityManagerRole) {
-      throw new ConflictException(
-        'SUSTAINABILITY_MANAGER role is not configured',
-      );
+    if (!companyESGAdminRole) {
+      throw new ConflictException('Company ESG Admin role is not configured');
     }
 
     const company: Company = await this.prisma.company.create({
       data: {
-        name: dto.company_name,
+        name: dto.name,
         registration_number: dto.registration_number,
-        industry_type: dto.industry_type,
+        sicsCode: dto.sicsCode || '010',
+        industry: dto.industry,
+        isoCountryCode: dto.isoCountryCode || 'NG',
         address: dto.address,
+        country: dto.country || 'Nigeria',
+        website: dto.website,
         contact_email: dto.contact_email,
         contact_phone: dto.contact_phone,
-        website: dto.company_website,
-        status: CompanyStatus.PENDING,
+        status: CompanyStatus.pending,
         created_by: 0,
         updated_by: 0,
       },
@@ -70,23 +79,29 @@ export class EsgAuthService {
         first_name: dto.first_name,
         last_name: dto.last_name,
         phone_number: dto.phone_number,
-        roleId: sustainabilityManagerRole.id,
+        roleId: companyESGAdminRole.id,
         companyId: company.id,
-        status: UserStatus.PENDING,
+        status: UserStatus.pending,
       },
     });
 
-    const allPermissions = await this.prisma.permission.findMany();
-    await this.prisma.userPermission.createMany({
-      data: allPermissions.map((perm) => ({
-        userId: user.id,
-        permissionId: perm.id,
-      })),
+    await this.prisma.company.update({
+      where: { id: company.id },
+      data: { created_by: user.id, updated_by: user.id },
     });
+
+    await this.emailService.sendEmail(dto.email, {
+      firstName: dto.first_name,
+      companyName: dto.name,
+      approvalMessage:
+        'Your ESG company is pending approval by our administrators.',
+    }, 7);
 
     return {
       message:
         'Registration successful. Your ESG company is pending approval by an administrator.',
+      user,
+      company,
     };
   }
 }
