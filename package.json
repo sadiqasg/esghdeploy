@@ -9,7 +9,7 @@
     "build": "nest build && prisma generate && prisma migrate deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/src/main.js",
-    "postinstall": "npx prisma generate --schema=prisma/schema",
+    "postinstall": "npx prisma generate --schema=prisma/schema.prisma",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -30,7 +30,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "prisma": {
-    "schema": "prisma/schema",
+    "schema": "prisma/schema.prisma",
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
