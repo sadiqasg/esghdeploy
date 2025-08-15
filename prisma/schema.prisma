@@ -1,0 +1,225 @@
+enum CompanyStatus {
+  pending
+  active
+  suspended
+  disabled
+}
+
+model Company {
+  id                  Int    @id @default(autoincrement())
+  name                String @unique
+  registration_number String
+
+  sicsCode       String
+  isinCode       String?
+  isoCountryCode String
+  sector         String?
+  subSector      String?
+  industry       String?
+
+  address                   String
+  country                   String?
+  contact_email             String
+  website                   String?
+  contact_phone             String
+  company_logo_url          String?
+  status                    CompanyStatus @default(pending)
+  staff                     Json?
+  created_at                DateTime      @default(now())
+  created_by                Int
+  updated_at                DateTime      @updatedAt
+  updated_by                Int
+  current_subscription_tier Int?
+
+  subscription Subscription? @relation(fields: [current_subscription_tier], references: [id], name: "CompanyCurrentSubscription")
+
+  users User[] @relation("CompanyUsers")
+
+  companySubscriptions CompanySubscription[] @relation("CompanySubs")
+  departments          Department[]
+  invitations     Invitation[]
+
+  @@index([status])
+  @@index([created_at])
+  @@map("companies")
+}
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+}
+
+model CompanySubscription {
+  id              Int                @id @default(autoincrement())
+  company_id      Int
+  subscription_id Int
+  start_date      DateTime
+  end_date        DateTime?
+  status          SubscriptionStatus @default(ACTIVE)
+  created_by      Int
+  updated_by      Int
+  created_at      DateTime           @default(now())
+  updated_at      DateTime           @updatedAt
+
+  Company      Company      @relation(fields: [company_id], references: [id], name: "CompanySubs")
+  Subscription Subscription @relation(fields: [subscription_id], references: [id], name: "CompanySubs")
+
+  @@index([company_id])
+  @@index([subscription_id])
+  @@index([status])
+  @@map("company_subscriptions")
+}
+model Department {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  leadId Int
+  lead   User   @relation("DepartmentLead", fields: [leadId], references: [id])
+  users  User[] @relation("DepartmentUsers")
+
+  contact_email String
+  companyId     Int
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitations   Invitation[]
+  
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([companyId, name])
+}
+enum InvitationStatus {
+  pending
+  accepted
+  expired
+  cancelled
+}
+
+model Invitation {
+  id            Int              @id @default(autoincrement())
+  email         String
+  token         String           @unique
+  status        InvitationStatus @default(pending)
+  expiresAt     DateTime
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  companyId     Int
+  company       Company          @relation(fields: [companyId], references: [id])
+
+  departmentId  Int?
+  department    Department?      @relation(fields: [departmentId], references: [id])
+
+  roleId        Int
+  role          Role             @relation(fields: [roleId], references: [id])
+
+  invitedById   Int
+  invitedBy     User             @relation(fields: [invitedById], references: [id])
+}
+model rate_limit {
+  key        String   @id
+  hits       Int
+  expires_at DateTime
+}
+model RefreshToken {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  user          User     @relation(fields: [user_id], references: [id])
+  refresh_token String   @unique
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+  @@index([refresh_token])
+  @@map("refresh_tokens")
+}
+enum RoleName {
+  super_admin
+  platform_subadmin
+  platform_data_officer
+  platform_viewer
+  company_esg_admin
+  company_esg_subadmin
+  company_esg_data_officer
+  company_esg_viewer
+}
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  users       User[]
+  invitations Invitation[]
+
+  @@map("roles")
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model Subscription {
+  id               Int      @id @default(autoincrement())
+  name             String   @unique
+  description      String?
+  price_monthly    Float
+  price_annual     Float
+  discount         Float?
+  max_team_members Int?
+  features         Json?
+  created_at       DateTime @default(now())
+  created_by       Int
+  updated_at       DateTime @updatedAt
+  updated_by       Int
+
+  companySubscriptions CompanySubscription[] @relation("CompanySubs")
+  companies            Company[]             @relation("CompanyCurrentSubscription")
+
+  @@map("subscription")
+}
+enum UserStatus {
+  pending
+  active
+  approved
+  suspended
+  disabled
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  email        String  @unique @db.VarChar(255)
+  password     String  @db.VarChar(255)
+  first_name   String  @db.VarChar(100)
+  last_name    String? @db.VarChar(100)
+  phone_number String? @db.VarChar(20)
+
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
+
+  companyId Int
+  company   Company? @relation(fields: [companyId], references: [id], name: "CompanyUsers")
+
+  departmentId    Int?
+  department      Department?  @relation(fields: [departmentId], references: [id], name: "DepartmentUsers")
+  leadDepartments Department[] @relation("DepartmentLead")
+  invitationsSent Invitation[]
+
+  status            UserStatus     @default(pending)
+  profile_photo_url String?        @db.VarChar(255)
+  last_login        DateTime?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+  refresh_tokens    RefreshToken[]
+  otpHash           String?
+  otpExpiresAt      DateTime?
+
+  @@index([email])
+  @@index([status])
+  @@index([companyId])
+  @@index([created_at])
+  @@map("users")
+}
