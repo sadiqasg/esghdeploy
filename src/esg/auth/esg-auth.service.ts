@@ -9,13 +9,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { EsgSignupDto } from './dtos/esg-signup.dto';
 import { isCompanyEmail } from 'src/utils/blacklist-emails';
 import { EmailService } from 'src/email/email.service';
+import { CompleteInviteSignupDto } from './dtos/complete-invite-signup.dto';
 
 @Injectable()
 export class EsgAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   async signup(dto: EsgSignupDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -26,11 +27,11 @@ export class EsgAuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    if (!isCompanyEmail(dto.email)) {
-      throw new BadRequestException(
-        'Please register with your company email address, not a personal email.',
-      );
-    }
+    // if (!isCompanyEmail(dto.email)) {
+    //   throw new BadRequestException(
+    //     'Please register with your company email address, not a personal email.',
+    //   );
+    // }
 
     const existingCompany: Company | null = await this.prisma.company.findFirst(
       {
@@ -42,6 +43,14 @@ export class EsgAuthService {
       throw new ConflictException(
         'Company with this registration number already exists',
       );
+    }
+
+    const existingCompanyByName = await this.prisma.company.findUnique({
+      where: { name: dto.name },
+    });
+
+    if (existingCompanyByName) {
+      throw new ConflictException('Company with this name already exists');
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -90,12 +99,16 @@ export class EsgAuthService {
       data: { created_by: user.id, updated_by: user.id },
     });
 
-    await this.emailService.sendEmail(dto.email, {
-      firstName: dto.first_name,
-      companyName: dto.name,
-      approvalMessage:
-        'Your ESG company is pending approval by our administrators.',
-    }, 7);
+    await this.emailService.sendEmail(
+      dto.email,
+      {
+        firstName: dto.first_name,
+        companyName: dto.name,
+        approvalMessage:
+          'Your ESG company is pending approval by our administrators.',
+      },
+      7,
+    );
 
     return {
       message:
@@ -104,4 +117,39 @@ export class EsgAuthService {
       company,
     };
   }
+
+
+  async completeSignupFromInvitation(token: string, dto: CompleteInviteSignupDto) {
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { token },
+      include: { role: true, company: true, department: true },
+    });
+
+    if (!invitation || invitation.status !== 'pending') {
+      throw new BadRequestException('Invalid or expired invitation.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: invitation.email,
+        password: hashedPassword,
+        first_name: dto.first_name,
+        last_name: dto.last_name,
+        companyId: invitation.companyId,
+        departmentId: invitation.departmentId,
+        roleId: invitation.roleId,
+        status: UserStatus.active,
+      },
+    });
+
+    await this.prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { status: 'accepted' },
+    });
+
+    return { message: 'Signup complete', user };
+  }
+
 }

@@ -14,7 +14,7 @@ export class AuthService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private otpService: OtpService,
-  ) {}
+  ) { }
 
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
@@ -42,12 +42,12 @@ export class AuthService {
     const { email, password } = dto;
     const user = await this.validateUser(email, password);
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role.name,
-      companyId: user.companyId,
-    });
+
+    const accessToken = this.jwtService.sign(
+      { sub: user.id, email: user.email, role: user.role.name, companyId: user.companyId },
+      { expiresIn: '15m' }
+    );
+
 
     const refreshToken = await this.prisma.refreshToken.create({
       data: {
@@ -121,16 +121,35 @@ export class AuthService {
   async refresh(refresh_token: string) {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { refresh_token },
+      include: { user: { include: { role: true, company: true } } },
     });
 
     if (!stored) throw new UnauthorizedException('Invalid refresh token');
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: stored.user_id },
-    });
+    if (stored.expires_at < new Date()) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
 
-    return { user };
+    const newAccessToken = this.jwtService.sign(
+      {
+        sub: stored.user.id,
+        email: stored.user.email,
+        role: stored.user.role.name,
+        companyId: stored.user.companyId,
+      },
+      { expiresIn: '1h' }
+    );
+
+    return {
+      accessToken: newAccessToken,
+      user: {
+        ...stored.user,
+        role: stored.user.role.name,
+        company: stored.user.company?.name,
+      },
+    };
   }
+
 
   async verifyEmail(email: string, otp: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
